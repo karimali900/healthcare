@@ -3,5 +3,15 @@ __pycache__/
 *.pyo
 dist/
 build/
+dist_linux/
 .venv/
 **/.venv/
+.directory
+*.spec
+pyarmor.bug.log
+obf_dist/
+pyarmor/
+pyarmor-config.json
+pyarmor-reg.json
+.DS_Store
+thumbs.db
