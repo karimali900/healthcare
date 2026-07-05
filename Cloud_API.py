@@ -26,7 +26,6 @@ from database import (
     get_ultrasound_exams, get_ultrasound_exam,
     upsert_maternal_history, get_maternal_history,
     upsert_paternal_history, get_paternal_history,
-    add_admission, discharge_patient, get_admissions, get_ward_stats,
     add_delivery, get_deliveries,
     add_newborn, get_newborns,
     add_antenatal_visit, get_antenatal_visits,
@@ -54,7 +53,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Obstetrics Management System", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Private Clinic — Obstetrics Management", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 os.makedirs("data", exist_ok=True)
@@ -497,9 +496,8 @@ async def comprehensive_report(patient_id: str):
     ultrasound = get_ultrasound_exams(patient_id)
     maternal = get_maternal_history(patient_id)
     paternal = get_paternal_history(patient_id)
-    admissions = get_admissions(patient_id)
-    deliveries = get_deliveries(patient_id)
     newborns = get_newborns(patient_id)
+    deliveries = get_deliveries(patient_id)
     anc = get_antenatal_visits(patient_id)
     labs = get_investigations(patient_id)
     return {
@@ -509,7 +507,6 @@ async def comprehensive_report(patient_id: str):
         "ultrasound_exams": ultrasound,
         "maternal_history": maternal,
         "paternal_history": paternal,
-        "admissions": admissions,
         "deliveries": deliveries,
         "newborns": newborns,
         "antenatal_visits": anc,
@@ -612,28 +609,6 @@ async def get_paternal_history_endpoint(patient_id: str):
 
 
 # ── Ward / Admission endpoints ──
-@app.post("/api/admissions/admit")
-async def admit_patient(body: dict):
-    pid = body.get("patient_id")
-    if not pid or not get_patient(pid):
-        raise HTTPException(404, "Patient not found")
-    aid = add_admission(pid, body.get("ward_type", "Antenatal"),
-                        body.get("bed_number"), body.get("admission_reason"),
-                        body.get("admitted_by"))
-    return {"status": "success", "admission_id": aid, "message": "Patient admitted"}
-
-@app.post("/api/admissions/{admission_id}/discharge")
-async def discharge(admission_id: int, body: dict = {}):
-    discharge_patient(admission_id, body.get("discharge_summary"))
-    return {"status": "success", "message": "Patient discharged"}
-
-@app.get("/api/admissions")
-async def list_admissions(patient_id: str = None, status: str = None):
-    return get_admissions(patient_id, status)
-
-@app.get("/api/ward/stats")
-async def ward_stats():
-    return get_ward_stats()
 
 
 # ── Delivery & Newborn endpoints ──
@@ -834,7 +809,7 @@ async def health():
 # ── Root ──
 @app.get("/")
 async def root():
-    return {"name": "Obstetrics Management System",
+    return {"name": "Private Clinic — Obstetrics Management",
             "version": "2.0.0", "status": "operational",
             "timestamp": datetime.now().isoformat()}
 
@@ -845,7 +820,7 @@ DASHBOARD = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Obstetrics Management System</title>
+<title>Private Clinic — Obstetrics Management</title>
 <script>window.onerror=function(m){var e=document.getElementById('jsError');if(e){e.textContent='⚠ Application error: '+(m||'unknown')+'. Please refresh or contact support.';e.style.display='block'}};</script>
 <script>var _fd=__FACILITY_DATA__;window.__FD__=_fd;</script>
 
@@ -945,8 +920,8 @@ tr:hover td{background:#1a1a3a}
   <div class="login-box">
     <div class="logo">🏥</div>
     <img id="loginLogo" src="" style="max-width:120px;max-height:120px;margin:0 auto .5rem;display:none;border-radius:8px">
-    <h2 id="lgnTitle">Obstetrics Management System</h2>
-    <p class="tagline" id="lgnTagline">Maternity Ward · Labor & Delivery · Postnatal Care</p>
+    <h2 id="lgnTitle">Private Clinic — Obstetrics Management</h2>
+    <p class="tagline" id="lgnTagline">Maternity Care · Antenatal Visits · Follow-ups</p>
     <div class="fields">
       <label id="lblUser">Username</label><input id="loginUser" value="admin" autocomplete="username">
       <label id="lblPass">Password</label>
@@ -968,7 +943,7 @@ tr:hover td{background:#1a1a3a}
       <button class="lang-btn" onclick="setLang('ar')" id="langAr">عربي</button>
     </div>
     <div style="text-align:center;margin-top:.6rem;padding-top:.6rem;border-top:1px solid #1e1e3a;font-size:.65rem;color:#444;line-height:1.4" id="loginBranding">
-      created by Karim Abdelaziz<br>00201029927276
+      Private Clinic MS · created by Karim Abdelaziz<br>00201029927276
     </div>
   </div>
 </div>
@@ -985,7 +960,6 @@ tr:hover td{background:#1a1a3a}
     <h2>🏥 OMS</h2>
     <div class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="ico">📊</span><span>Dashboard</span></div>
     <div class="nav-item" data-tab="patients" onclick="switchTab('patients')"><span class="ico">👤</span><span>Patients</span></div>
-    <div class="nav-item" data-tab="admissions" onclick="switchTab('admissions')"><span class="ico">🛏</span><span>Admissions</span></div>
     <div class="nav-item" data-tab="ld" onclick="switchTab('ld')"><span class="ico">👶</span><span>L&amp;D</span></div>
     <div class="nav-item" data-tab="antenatal" onclick="switchTab('antenatal')"><span class="ico">📋</span><span>Antenatal</span></div>
     <div class="nav-item" data-tab="assess" onclick="switchTab('assess')"><span class="ico">🔬</span><span>Assess</span></div>
@@ -1004,23 +978,21 @@ tr:hover td{background:#1a1a3a}
     </div>
     <div class="user-info"><span id="userDisplay">admin</span><br><span style="cursor:pointer;color:#7c6ff0" onclick="doLogout()">Sign out</span></div>
     <div style="padding:.6rem 1.2rem;font-size:.6rem;color:#333;border-top:1px solid #1e1e3a;text-align:center;line-height:1.3" id="sidebarBranding">
-      created by Karim Abdelaziz<br>00201029927276
+      Private Clinic MS · created by Karim Abdelaziz<br>00201029927276
     </div>
   </nav>
 
   <div class="main">
     <button class="back-btn" id="backBtn" onclick="goBack()" title="Go back">← Back</button>
     <div id="tab-dashboard">
-      <h1 id="dashTitle">🏥 Obstetrics Dashboard</h1>
-      <p class="sub">Ward overview · Active patients · Today's deliveries</p>
+      <h1 id="dashTitle">🏥 Private Clinic — Obstetrics Management</h1>
+      <p class="sub">Patient overview · Antenatal care · Follow-ups</p>
       <div class="grid">
         <div class="card"><h3>Total Patients</h3><div id="totalPatients" style="font-size:2rem;color:#7c6ff0;font-weight:700">--</div></div>
-        <div class="card"><h3>Active Admissions</h3><div id="activeAdmissions" style="font-size:2rem;color:#3ba55c;font-weight:700">--</div></div>
-        <div class="card"><h3>Deliveries Today</h3><div id="deliveriesToday" style="font-size:2rem;color:#faa61a;font-weight:700">--</div></div>
+        <div class="card"><h3>Follow-ups This Week</h3><div id="dashFollowUpsCount" style="font-size:2rem;color:#3ba55c;font-weight:700">--</div></div>
         <div class="card"><h3>High Risk</h3><div id="highRiskCount" style="font-size:2rem;color:#ed4245;font-weight:700">--</div></div>
       </div>
       <div class="grid">
-        <div class="card"><h3>Ward Census</h3><div id="wardCensus" style="font-size:.85rem;color:#999">Loading...</div></div>
         <div class="card"><h3>Risk Distribution</h3><div class="chart-wrap"><canvas id="overviewChart"></canvas></div></div>
         <div class="card"><h3>Upcoming Follow-ups (7 days)</h3><div id="dashFollowUps" style="font-size:.78rem;color:#999;max-height:150px;overflow-y:auto">Loading...</div></div>
       </div>
@@ -1029,14 +1001,15 @@ tr:hover td{background:#1a1a3a}
       <div class="card" style="margin-top:1.2rem">
         <h3>BMI Calculator</h3>
         <div class="fields">
-          <label>Height (cm)</label><input id="bmiHeight" value="165" type="number" step="0.1">
-          <label>Weight (kg)</label><input id="bmiWeight" value="70" type="number" step="0.1">
+          <label>Height (cm)</label><input id="bmiHeight" value="165" type="number" step="0.1" oninput="calcBMI()">
+          <label>Weight (kg)</label><input id="bmiWeight" value="70" type="number" step="0.1" oninput="calcBMI()">
         </div>
-        <div class="row">
-          <button class="btn btn-primary btn-xs" onclick="calcBMI()">Calculate</button>
-          <span id="bmiResult" style="font-size:1.1rem;font-weight:700;color:#7c6ff0"></span>
+        <div style="display:flex;align-items:center;gap:1rem;margin-top:.6rem">
+          <span id="bmiResultDisplay" style="font-size:2rem;font-weight:800;color:#7c6ff0">--</span>
+          <span style="color:#555;font-size:.8rem">kg/m²</span>
+          <span id="bmiResult" style="display:none"></span>
         </div>
-        <div id="bmiCategory" style="margin-top:.4rem;font-size:.8rem"></div>
+        <div id="bmiCategory" style="margin-top:.4rem;font-size:.85rem"></div>
       </div>
     </div>
 
@@ -1071,36 +1044,6 @@ tr:hover td{background:#1a1a3a}
            <table><thead><tr><th>ID</th><th>Name</th><th>Age</th><th>BMI</th><th>Blood</th><th>Case</th><th>Actions</th></tr></thead><tbody id="patientTableBody"></tbody></table>
           <div class="pagination" id="patientPagination"></div>
         </div>
-      </div>
-    </div>
-
-    <div id="tab-admissions" style="display:none">
-      <h1>🛏 Admissions & Ward Management</h1>
-      <p class="sub">Admit patients · Manage beds · Discharge</p>
-      <div class="grid">
-        <div class="card">
-          <h3>Admit Patient</h3>
-          <div class="fields">
-            <label>Patient ID</label><input id="admPid" value="P001" list="patientList">
-            <label>Ward Type</label><select id="admWard"><option>Antenatal</option><option>Postnatal</option><option>Labor & Delivery</option><option>NICU</option><option>Observation</option></select>
-            <label>Bed Number</label><input id="admBed" placeholder="e.g. A-12">
-            <label>Reason for Admission</label><textarea id="admReason" rows="2" placeholder="Clinical reason for admission..."></textarea>
-            <label>Admitted By</label><input id="admBy" value="Dr. Smith">
-          </div>
-          <div class="row"><button class="btn btn-primary" onclick="admitPatient()">Admit Patient</button></div>
-        </div>
-        <div class="card">
-          <h3>Active Admissions</h3>
-          <div class="fields"><label>Filter by Patient ID</label><input id="admFilter" oninput="loadAdmissions()" placeholder="Patient ID"></div>
-          <div id="admissionList" style="font-size:.78rem;color:#999">Loading...</div>
-        </div>
-      </div>
-      <div class="card"><h3>Discharge Patient</h3>
-        <div class="fields">
-          <label>Admission ID</label><input id="dischargeAid" type="number" placeholder="Enter admission ID">
-          <label>Discharge Summary</label><textarea id="dischargeSummary" rows="3" placeholder="Summary of hospital stay, outcome, and follow-up plan..."></textarea>
-        </div>
-        <div class="row"><button class="btn btn-danger" onclick="dischargePatient()">Discharge</button></div>
       </div>
     </div>
 
@@ -1587,8 +1530,8 @@ let currentLang = localStorage.getItem('lang') || 'en';
 
 const LANG = {
   en: {
-    loginTitle: 'Obstetrics Management System',
-    loginTagline: 'Maternity Ward · Labor & Delivery · Postnatal Care',
+    loginTitle: 'Private Clinic — Obstetrics Management',
+    loginTagline: 'Maternity Care · Antenatal Visits · Follow-ups',
     username: 'Username',
     password: 'Password',
     signIn: 'Sign In',
@@ -1901,8 +1844,8 @@ const LANG = {
     oPosShort: 'O+'
   },
   ar: {
-    loginTitle: 'نظام إدارة التوليد',
-    loginTagline: 'جناح الأمومة · المخاض والولادة · رعاية ما بعد الولادة',
+    loginTitle: 'العيادة الخاصة — إدارة التوليد',
+    loginTagline: 'رعاية الأمومة · زيارات الحمل · المتابعات',
     username: 'اسم المستخدم',
     password: 'كلمة المرور',
     signIn: 'تسجيل الدخول',
@@ -2232,19 +2175,20 @@ async function loadBranding(){
     if(bn){
       const dt=document.getElementById('dashTitle');if(dt){dt.innerHTML='🏥 '+bn;dt.dataset.enText=bn}
     }
+    // Show logo
     const ll=document.getElementById('loginLogo');
     const sl=document.getElementById('sidebarLogo');
     if(logoPath){
       if(ll){ll.src=logoPath;ll.style.display='block'}
       if(sl){sl.src=logoPath;sl.style.display='block'}
     }else{
+      // Try default logo
       const defLogo='/data/logos/default.jpg';
       if(ll){ll.src=defLogo;ll.style.display='block'}
       if(sl){sl.src=defLogo;sl.style.display='block'}
     }
   }catch(e){/* branding fallback silently */}
 }
-
 function setLang(lang){
   currentLang = lang;
   localStorage.setItem('lang', lang);
@@ -2428,7 +2372,6 @@ function initApp(){
   loadDashboard();
   loadPatientTable();
   loadPatientDropdown();
-  loadAdmissions();
   calcEDD(document.getElementById('plmp')?.value);
   loadPatientData(document.getElementById('ppPid')?.value);
   getNextPatientId();
@@ -2456,7 +2399,6 @@ function switchTab(tab){
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.tab===tab));
   if(tab==='dashboard') loadDashboard();
   if(tab==='patients'){loadPatientTable();calcEDD(document.getElementById('plmp')?.value);}
-  if(tab==='admissions') loadAdmissions();
   if(tab==='investigations') loadInvestigationHistory();
   if(tab==='followup'){loadPendingFollowUps();document.getElementById('fuDate').value=new Date().toISOString().slice(0,10);}
   if(tab==='assess'){loadPatientData(document.getElementById('ppPid')?.value);}
@@ -2511,15 +2453,13 @@ async function loadDashboard(){
   try{
     const patients=await api('/api/patients?per_page=1');
     document.getElementById('totalPatients').textContent=patients.total||0;
-    // Ward stats
+    // Count follow-ups this week
     try{
-      const ward=await api('/api/ward/stats');
-      document.getElementById('activeAdmissions').textContent=ward.total_active||0;
-      document.getElementById('deliveriesToday').textContent=ward.deliveries_today||0;
-      const wc=document.getElementById('wardCensus');
-      const wards=Object.entries(ward.by_ward||{});
-      if(wards.length) wc.innerHTML=wards.map(([t,c])=>'<div style="margin:.3rem 0"><span style="color:#7c6ff0">'+t+'</span>: <b>'+c+'</b> patients</div>').join('');
-      else wc.innerHTML='<span style="color:#555">No active admissions</span>';
+      const fu=await api('/api/follow-ups/pending?limit=100');
+      const weekFromNow=new Date(Date.now()+7*24*60*60*1000);
+      const weekFu=(fu||[]).filter(f=>new Date(f.follow_up_date)<=weekFromNow).length;
+      const el=document.getElementById('dashFollowUpsCount');
+      if(el) el.textContent=weekFu;
     }catch(e){}
     const recent=await api('/api/assessments/recent?limit=50');
     const list=document.getElementById('recentList');
@@ -2649,7 +2589,7 @@ async function register(){
       api('/api/follow-ups','POST',{patient_id:j.patient_id,follow_up_date:fuDate,type:'routine',notes:'Auto-scheduled from registration'}).catch(()=>{});
     }
     if(ct==='delivery'||ct==='both'){
-      api('/api/admissions/admit','POST',{patient_id:j.patient_id,ward_type:'Labor & Delivery',bed_number:null,admission_reason:'Auto-admitted: '+ct+' case',admitted_by:'System'}).catch(()=>{});
+      // Auto-create delivery record (clinic version — no ward admission)
     }
     loadPatientTable();loadPatientDropdown();
   }catch(e){showResult('<b>Error:</b> '+e.message,'badge-high');}
@@ -2911,44 +2851,6 @@ async function deleteUltrasoundExam(id){
   try{await api('/api/ultrasound/'+id,'DELETE');showResult('Ultrasound exam deleted','');loadUltrasoundHistory();}catch(e){showResult('<b>Error:</b> '+e.message,'badge-high');}
 }
 
-// ── Admissions ──
-async function admitPatient(){
-  const pid=U('admPid');
-  if(!pid){showResult('<b>Error:</b> Enter Patient ID','badge-high');return}
-  try{
-    await api('/api/admissions/admit','POST',{patient_id:pid,ward_type:U('admWard'),bed_number:U('admBed')||null,admission_reason:U('admReason')||null,admitted_by:U('admBy')||null});
-    showResult('<b>Admitted:</b> '+pid,'');loadAdmissions();
-  }catch(e){showResult('<b>Error:</b> '+e.message,'badge-high');}
-}
-
-async function dischargePatient(){
-  const aid=document.getElementById('dischargeAid').value;
-  const summary=U('dischargeSummary');
-  if(!aid){showResult('<b>Error:</b> Enter Admission ID','badge-high');return}
-  try{await api('/api/admissions/'+aid+'/discharge','POST',{discharge_summary:summary||null});showResult('<b>Discharged:</b> Admission #'+aid,'');loadAdmissions();}catch(e){showResult('<b>Error:</b> '+e.message,'badge-high');}
-}
-
-async function loadAdmissions(){
-  const filter=U('admFilter');
-  try{
-    const data=await api('/api/admissions'+(filter?'?patient_id='+filter:''));
-    const el=document.getElementById('admissionList');
-    if(!data||!data.length){el.innerHTML='<i style="color:#555">No admissions</i>';return}
-    el.innerHTML=data.map(a=>'<div class="recent-item" style="border-bottom:1px solid #1e1e3a;padding:.5rem 0">'+
-      '<b>#'+a.id+'</b> '+a.patient_name+' — '+a.ward_type+
-      (a.bed_number?' (Bed '+a.bed_number+')':'')+
-      ' | <span class="badge badge-'+(a.status==='active'?'low':'default')+'">'+a.status+'</span>'+
-      ' | <span style="color:#666">'+((a.admission_date||'').slice(0,10)||'')+'</span>'+
-      (a.status==='active'?' <button class="btn btn-danger btn-xs" onclick="quickDischarge('+a.id+')">DC</button>':'')+
-      '</div>').join('');
-  }catch(e){document.getElementById('admissionList').innerHTML='<i style="color:#ed4245">'+e.message+'</i>';}
-}
-
-async function quickDischarge(aid){
-  if(!confirm('Discharge admission #'+aid+'?')) return;
-  try{await api('/api/admissions/'+aid+'/discharge','POST',{});showResult('Discharged #'+aid,'');loadAdmissions();}catch(e){showResult('<b>Error:</b> '+e.message,'badge-high');}
-}
-
 // ── L&D ──
 async function recordDelivery(){
   const pid=U('ldPid');const el=document.getElementById('ldResult');
@@ -3205,21 +3107,6 @@ async function loadReport(){
     }
 
     // Admissions
-    if(j.admissions&&j.admissions.length){
-      html+='<div style="background:#16162a;border-radius:12px;padding:1.2rem;border:1px solid #2a2a4a;margin-bottom:1rem">';
-      html+='<h3 style="color:#7c6ff0;font-size:.95rem;margin-bottom:.6rem">Admissions ('+j.admissions.length+')</h3>';
-      j.admissions.forEach(a=>{
-        html+='<div style="border-bottom:1px solid #1e1e3a;padding:.4rem 0;font-size:.78rem">';
-        html+='<b>#'+a.id+'</b> — '+a.ward_type+(a.bed_number?' (Bed: '+a.bed_number+')':'')+
-          ' | <span class="badge badge-'+(a.status==='active'?'low':'default')+'">'+a.status+'</span>'+
-          ' | <span style="color:#666">'+(a.admission_date||'').slice(0,10)+'</span>'+
-          (a.admission_reason?'<br><span style="color:#888">Reason: '+a.admission_reason+'</span>':'')+
-          (a.discharge_summary?'<br><span style="color:#888">DC Summary: '+a.discharge_summary+'</span>':'');
-        html+='</div>';
-      });
-      html+='</div>';
-    }
-
     // Deliveries
     if(j.deliveries&&j.deliveries.length){
       html+='<div style="background:#16162a;border-radius:12px;padding:1.2rem;border:1px solid #2a2a4a;margin-bottom:1rem">';
@@ -3336,32 +3223,34 @@ function calcBMI(){
   const hCm=+document.getElementById('bmiHeight').value;
   const w=+document.getElementById('bmiWeight').value;
   const h=hCm/100;
-  if(!h||!w){document.getElementById('bmiResult').textContent='';document.getElementById('bmiCategory').textContent='';return}
+  const display=document.getElementById('bmiResultDisplay');
+  const catDiv=document.getElementById('bmiCategory');
+  if(!h||!w){display.textContent='--';catDiv.innerHTML='';return}
   const bmi=w/(h*h);
   const idealMin=18.5*h*h, idealMax=24.9*h*h;
   let cat,color,advice,delta;
   if(bmi<18.5){
     cat='Underweight';color='#faa61a';
     delta=idealMin-w;
-    advice='<b>Gain '+(delta).toFixed(1)+' kg</b> to reach minimum healthy weight ('+idealMin.toFixed(1)+' kg). Increase caloric intake with nutrient-dense foods, add healthy fats, and consider strength training.'
+    advice='<b>Gain '+(delta).toFixed(1)+' kg</b> to reach minimum healthy weight ('+idealMin.toFixed(1)+' kg).';
   }else if(bmi<25){
     cat='Normal';color='#3ba55c';
-    delta=w-idealMin;
-    advice='Your weight is within the healthy range. Maintain with a balanced diet (veggies, lean protein, whole grains) and regular physical activity (150 min/week moderate exercise).'
+    advice='Your weight is within the healthy range. Maintain with balanced diet and regular exercise.';
   }else if(bmi<30){
     cat='Overweight';color='#faa61a';
     delta=w-idealMax;
-    advice='<b>Lose '+(delta).toFixed(1)+' kg</b> to reach maximum healthy weight ('+idealMax.toFixed(1)+' kg). Focus on portion control, reduce processed foods/sugar, and aim for 30 min daily aerobic activity.'
+    advice='<b>Lose '+(delta).toFixed(1)+' kg</b> to reach maximum healthy weight ('+idealMax.toFixed(1)+' kg).';
   }else{
     cat='Obese';color='#ed4245';
     delta=w-idealMax;
-    advice='<b>Lose '+(delta).toFixed(1)+' kg</b> to reach healthy range. Consult a healthcare provider for a personalized plan. Prioritize whole foods, avoid sugary drinks, and gradually increase physical activity.'
+    advice='<b>Lose '+(delta).toFixed(1)+' kg</b> to reach healthy range. Consult a healthcare provider.';
   }
-  document.getElementById('bmiResult').textContent=bmi.toFixed(1);
-  document.getElementById('bmiCategory').innerHTML=
+  display.textContent=bmi.toFixed(1);
+  display.style.color=color;
+  catDiv.innerHTML=
     '<div style="margin-top:.3rem"><span class="badge" style="background:'+color+'">'+cat+'</span></div>'+
-    '<div style="margin-top:.4rem;font-size:.8rem;color:#999">Ideal range: <b>'+idealMin.toFixed(1)+' – '+idealMax.toFixed(1)+' kg</b> for '+hCm.toFixed(0)+' cm</div>'+
-    '<div style="margin-top:.2rem;font-size:.8rem;color:#ccc">'+advice+'</div>';
+    '<div style="margin-top:.4rem;color:#999">Ideal range: <b>'+idealMin.toFixed(1)+' – '+idealMax.toFixed(1)+' kg</b> for '+hCm.toFixed(0)+' cm</div>'+
+    '<div style="margin-top:.2rem;color:#ccc;font-size:.8rem">'+advice+'</div>';
 }
 
 // ── Utilities ──
@@ -3581,7 +3470,7 @@ async function loadTimeline(){
   </div>
 </div>
 <footer style="text-align:center;padding:1rem;font-size:.65rem;color:#333;border-top:1px solid #1e1e3a;margin-top:2rem" id="footerBranding">
-  created by Karim Abdelaziz &mdash; 00201029927276
+  Private Clinic MS · created by Karim Abdelaziz &mdash; 00201029927276
 </footer>
 </body>
 </html>"""
